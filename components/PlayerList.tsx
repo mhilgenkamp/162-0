@@ -196,22 +196,38 @@ function PlayerRow({
 
       {/* Stats */}
       {showStats && isHitter && player.hitterStats && (
-        <div className="flex gap-4 shrink-0 text-right">
-          <StatPair label="AVG" value={formatAvg(player.hitterStats.avg)} />
-          <StatPair label="OBP" value={formatAvg(player.hitterStats.obp)} />
-          <StatPair label="SLG" value={formatAvg(player.hitterStats.slg)} />
-          <StatPair label="PA"  value={player.hitterStats.pa.toString()} />
-          <StatPair label="dWAR" value={player.hitterStats.dWAR.toFixed(1)} />
-        </div>
+        <>
+          {/* Mobile: 2 key stats */}
+          <div className="flex gap-3 shrink-0 text-right sm:hidden">
+            <StatPair label="AVG" value={formatAvg(player.hitterStats.avg)} />
+            <StatPair label="OPS" value={(player.hitterStats.obp + player.hitterStats.slg).toFixed(3)} />
+          </div>
+          {/* Desktop: full stats */}
+          <div className="hidden sm:flex gap-4 shrink-0 text-right">
+            <StatPair label="AVG" value={formatAvg(player.hitterStats.avg)} />
+            <StatPair label="OBP" value={formatAvg(player.hitterStats.obp)} />
+            <StatPair label="SLG" value={formatAvg(player.hitterStats.slg)} />
+            <StatPair label="PA"  value={player.hitterStats.pa.toString()} />
+            <StatPair label="dWAR" value={player.hitterStats.dWAR.toFixed(1)} />
+          </div>
+        </>
       )}
       {showStats && !isHitter && player.pitcherStats && (
-        <div className="flex gap-4 shrink-0 text-right">
-          <StatPair label="ERA"  value={player.pitcherStats.era.toFixed(2)} />
-          <StatPair label="WHIP" value={player.pitcherStats.whip.toFixed(2)} />
-          <StatPair label="IP"   value={player.pitcherStats.ip.toString()} />
-          <StatPair label="K"    value={player.pitcherStats.k.toString()} />
-          <StatPair label="SV"   value={player.pitcherStats.saves.toString()} />
-        </div>
+        <>
+          {/* Mobile: 2 key stats */}
+          <div className="flex gap-3 shrink-0 text-right sm:hidden">
+            <StatPair label="ERA"  value={player.pitcherStats.era.toFixed(2)} />
+            <StatPair label="WHIP" value={player.pitcherStats.whip.toFixed(2)} />
+          </div>
+          {/* Desktop: full stats */}
+          <div className="hidden sm:flex gap-4 shrink-0 text-right">
+            <StatPair label="ERA"  value={player.pitcherStats.era.toFixed(2)} />
+            <StatPair label="WHIP" value={player.pitcherStats.whip.toFixed(2)} />
+            <StatPair label="IP"   value={player.pitcherStats.ip.toString()} />
+            <StatPair label="K"    value={player.pitcherStats.k.toString()} />
+            <StatPair label="SV"   value={player.pitcherStats.saves.toString()} />
+          </div>
+        </>
       )}
       {!showStats && (
         <span className="text-xs text-gray-600 italic shrink-0">Stats hidden</span>

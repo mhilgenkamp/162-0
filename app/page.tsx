@@ -26,9 +26,10 @@ export default function Home() {
   const [spinning, setSpinning] = useState(false);
   const [teamSkipsLeft, setTeamSkipsLeft] = useState(1);
   const [decadeSkipsLeft, setDecadeSkipsLeft] = useState(1);
-
+  const [showRoster, setShowRoster] = useState(false);
 
   const pickNumber = roster.filter((s) => s.player !== null).length + 1;
+  const draftedCount = roster.filter((s) => s.player !== null).length;
 
   const getDraftedIds = (r: RosterSlot[]) =>
     new Set(r.filter((s) => s.player).map((s) => s.player!.id));
@@ -209,21 +210,21 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-950 text-white flex flex-col">
       {/* Top bar */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-800">
-        <h1 className="text-xl font-black tracking-tight mr-2">162-0</h1>
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-800">
+        <h1 className="text-xl font-black tracking-tight shrink-0">162-0</h1>
 
-        {/* Spin result badges */}
+        {/* Spin result badges — hidden on mobile (shown in player list header) */}
         {spinning ? (
-          <div className="flex gap-2">
-            <div className="h-8 w-40 bg-gray-800 rounded-full animate-pulse" />
-            <div className="h-8 w-20 bg-gray-800 rounded-full animate-pulse" />
+          <div className="hidden sm:flex gap-2 ml-1">
+            <div className="h-7 w-36 bg-gray-800 rounded-full animate-pulse" />
+            <div className="h-7 w-16 bg-gray-800 rounded-full animate-pulse" />
           </div>
         ) : (
-          <div className="flex gap-2 items-center">
-            <span className="bg-gray-700 text-white text-sm font-bold px-4 py-1.5 rounded-full">
+          <div className="hidden sm:flex gap-2 items-center ml-1">
+            <span className="bg-gray-700 text-white text-sm font-bold px-4 py-1 rounded-full">
               {spinResult.team}
             </span>
-            <span className="bg-yellow-500 text-gray-900 text-sm font-bold px-4 py-1.5 rounded-full">
+            <span className="bg-yellow-500 text-gray-900 text-sm font-bold px-4 py-1 rounded-full">
               {spinResult.decade}
             </span>
           </div>
@@ -231,35 +232,35 @@ export default function Home() {
 
         {/* Skips */}
         {!spinning && (
-          <div className="flex gap-2 ml-2">
+          <div className="flex gap-1.5 sm:gap-2 sm:ml-2">
             <button
               onClick={handleSkipTeam}
               disabled={teamSkipsLeft === 0}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed text-gray-300 transition-colors border border-gray-700"
+              className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-full bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed text-gray-300 transition-colors border border-gray-700"
             >
-              <span className="text-yellow-400">↻</span> Team
-              <span className="text-gray-500">({teamSkipsLeft})</span>
+              <span className="text-yellow-400">↻</span>
+              <span className="hidden sm:inline">Team </span>({teamSkipsLeft})
             </button>
             <button
               onClick={handleSkipDecade}
               disabled={decadeSkipsLeft === 0}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed text-gray-300 transition-colors border border-gray-700"
+              className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-full bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed text-gray-300 transition-colors border border-gray-700"
             >
-              <span className="text-yellow-400">↻</span> Decade
-              <span className="text-gray-500">({decadeSkipsLeft})</span>
+              <span className="text-yellow-400">↻</span>
+              <span className="hidden sm:inline">Decade </span>({decadeSkipsLeft})
             </button>
           </div>
         )}
 
-        <div className="ml-auto text-sm text-gray-500">
-          Round <span className="text-white font-bold">{pickNumber}</span> / 15
+        <div className="ml-auto text-sm text-gray-500 shrink-0">
+          <span className="text-white font-bold">{pickNumber}</span>/15
         </div>
       </div>
 
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left: player list */}
-        <div className="flex-1 flex flex-col p-4 overflow-hidden">
+        {/* Player list — full width on mobile, flex-1 on desktop */}
+        <div className={`flex-col p-3 overflow-hidden flex-1 ${showRoster ? "hidden md:flex" : "flex"}`}>
           {spinning ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-gray-500 animate-pulse text-sm">Spinning...</div>
@@ -276,13 +277,24 @@ export default function Home() {
           )}
         </div>
 
-        {/* Right: roster panel */}
-        <div className="w-72 shrink-0 border-l border-gray-800 p-4 overflow-y-auto">
-          <RosterPanel
-            roster={roster}
-            activeSlots={openSlots}
-          />
+        {/* Roster panel — always visible on desktop, toggled on mobile */}
+        <div className={`border-l border-gray-800 p-3 overflow-y-auto md:w-72 md:shrink-0 ${showRoster ? "flex flex-col w-full" : "hidden md:block"}`}>
+          <RosterPanel roster={roster} activeSlots={openSlots} />
         </div>
+      </div>
+
+      {/* Mobile roster toggle */}
+      <div className="md:hidden border-t border-gray-800 p-2">
+        <button
+          onClick={() => setShowRoster((v) => !v)}
+          className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all ${
+            showRoster
+              ? "bg-yellow-500 text-gray-900"
+              : "bg-gray-800 text-white border border-gray-700"
+          }`}
+        >
+          {showRoster ? "← Back to Players" : `Roster (${draftedCount} / 15)`}
+        </button>
       </div>
     </main>
   );
