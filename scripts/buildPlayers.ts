@@ -72,15 +72,35 @@ function toDecade(year: number): string | null {
 console.log("Opening Lahman SQLite...");
 const db = new Database(path.join(DATA_DIR, "lahman.sqlite"), { readonly: true });
 
+interface PersonRow  { playerID: string; nameFirst: string | null; nameLast: string | null; }
+interface TeamRow    { teamID: string; yearID: number; franchID: string; }
+interface FieldingRow     { playerID: string; yearID: number; POS: string; G: number; }
+interface AppearancesRow  {
+  playerID: string; yearID: number;
+  G_dh: number; G_c: number; G_1b: number; G_2b: number; G_3b: number;
+  G_ss: number; G_lf: number; G_cf: number; G_rf: number;
+}
+interface BattingRow  {
+  playerID: string; yearID: number; teamID: string;
+  AB: number; H: number; D: number; T: number; HR: number;
+  BB: number; HBP: number; SF: number; SH: number;
+}
+interface PitchingRow {
+  playerID: string; yearID: number; teamID: string;
+  ERA: number | null; ER: number | null; IPouts: number;
+  H: number; BB: number; SO: number; SV: number;
+}
+interface OutputRecord { position: string; decade: string; }
+
 // playerID → full name
 const nameMap = new Map<string, string>(
-  (db.prepare("SELECT playerID, nameFirst, nameLast FROM People").all() as any[])
+  (db.prepare("SELECT playerID, nameFirst, nameLast FROM People").all() as unknown as PersonRow[])
     .map((r) => [r.playerID, `${r.nameFirst ?? ""} ${r.nameLast ?? ""}`.trim()])
 );
 
 // (teamID, yearID) → franchID
 const teamFranch = new Map<string, string>();
-for (const r of db.prepare("SELECT teamID, yearID, franchID FROM Teams").all() as any[]) {
+for (const r of db.prepare("SELECT teamID, yearID, franchID FROM Teams").all() as unknown as TeamRow[]) {
   teamFranch.set(`${r.teamID}-${r.yearID}`, r.franchID);
 }
 
@@ -90,7 +110,8 @@ function franchID(teamID: string, year: number): string | null {
 
 // (playerID, yearID) → primary game position
 // Use FieldingOFsplit for outfielders (gives LF/CF/RF), Fielding for everyone else.
-const posMap = new Map<string, string>(); // "playerID-yearID" → game position
+const posMap   = new Map<string, string>(); // "playerID-yearID" → position label
+const posGames = new Map<string, number>(); // "playerID-yearID" → games at that position
 
 const POS_REMAP: Record<string, string> = {
   C: "C", "1B": "1B", "2B": "2B", "3B": "3B", SS: "SS",
@@ -102,29 +123,27 @@ const POS_REMAP: Record<string, string> = {
 // Load FieldingOFsplit first (more specific for OF)
 for (const r of db.prepare(
   "SELECT playerID, yearID, POS, G FROM FieldingOFsplit WHERE G > 0"
-).all() as any[]) {
+).all() as unknown as FieldingRow[]) {
   const key = `${r.playerID}-${r.yearID}`;
-  const existing = posMap.get(key);
   const mapped = POS_REMAP[r.POS] ?? null;
   if (!mapped || !["LF", "CF", "RF"].includes(mapped)) continue;
   // Keep whichever position had most games (accumulate across stints)
-  if (!existing || r.G > (posMap.get(`${key}-g`) ?? 0)) {
+  if (!posMap.has(key) || r.G > (posGames.get(key) ?? 0)) {
     posMap.set(key, mapped);
-    posMap.set(`${key}-g`, r.G);
+    posGames.set(key, r.G);
   }
 }
 
 // Fielding table for non-OF positions
 for (const r of db.prepare(
   "SELECT playerID, yearID, POS, G FROM Fielding WHERE G > 0 AND POS != 'OF' AND POS != 'P'"
-).all() as any[]) {
+).all() as unknown as FieldingRow[]) {
   const key = `${r.playerID}-${r.yearID}`;
   const mapped = POS_REMAP[r.POS] ?? null;
   if (!mapped || mapped === "LF") continue; // skip OF fallback here
-  const prevG = posMap.get(`${key}-g`) ?? 0;
-  if (!posMap.has(key) || r.G > prevG) {
+  if (!posMap.has(key) || r.G > (posGames.get(key) ?? 0)) {
     posMap.set(key, mapped);
-    posMap.set(`${key}-g`, r.G);
+    posGames.set(key, r.G);
   }
 }
 
@@ -132,7 +151,7 @@ for (const r of db.prepare(
 // Override posMap if G_dh is the plurality position for that season
 for (const r of db.prepare(
   "SELECT playerID, yearID, G_dh, G_c, G_1b, G_2b, G_3b, G_ss, G_lf, G_cf, G_rf FROM Appearances WHERE G_dh > 0"
-).all() as any[]) {
+).all() as unknown as AppearancesRow[]) {
   const key = `${r.playerID}-${r.yearID}`;
   const dhGames = r.G_dh ?? 0;
   // Max games at any fielding position this season
@@ -140,7 +159,7 @@ for (const r of db.prepare(
                             r.G_lf??0, r.G_cf??0, r.G_rf??0);
   if (dhGames > fieldMax) {
     posMap.set(key, "DH");
-    posMap.set(`${key}-g`, dhGames);
+    posGames.set(key, dhGames);
   }
 }
 
@@ -149,7 +168,7 @@ type BatStats = { avg: number; obp: number; slg: number; pa: number };
 const batStats = new Map<string, BatStats>();
 for (const r of db.prepare(
   "SELECT playerID, yearID, teamID, AB, H, \"2B\" as D, \"3B\" as T, HR, BB, HBP, SF, SH FROM Batting"
-).all() as any[]) {
+).all() as unknown as BattingRow[]) {
   const ab = r.AB ?? 0, h = r.H ?? 0, d = r.D ?? 0, t = r.T ?? 0, hr = r.HR ?? 0;
   const bb = r.BB ?? 0, hbp = r.HBP ?? 0, sf = r.SF ?? 0, sh = r.SH ?? 0;
   const pa  = ab + bb + hbp + sf + sh;
@@ -164,7 +183,7 @@ type PitchStats = { era: number; whip: number; ip: number; k: number; saves: num
 const pitchStats = new Map<string, PitchStats>();
 for (const r of db.prepare(
   "SELECT playerID, yearID, teamID, ERA, IPouts, H, BB, SO, SV FROM Pitching"
-).all() as any[]) {
+).all() as unknown as PitchingRow[]) {
   const ip   = (r.IPouts ?? 0) / 3;
   const era  = r.ERA != null ? r.ERA : ip > 0 ? ((r.ER ?? 0) / ip) * 9 : 99;
   const whip = ip > 0 ? ((r.BB ?? 0) + (r.H ?? 0)) / ip : 99;
@@ -257,7 +276,7 @@ for (const r of warPitchRows) {
   const g   = parseInt(r.G)  || 0;
   if (ip < MIN_IP_SEASON) continue;
 
-  let fid = franchID(r.team_ID, year);
+  const fid = franchID(r.team_ID, year);
   if (!fid) continue;
 
   const modernTeam = FRANCHISE_NAMES[fid];
@@ -401,7 +420,7 @@ console.log(`\nDone — ${output.length} records → ${OUT_FILE}`);
 
 const byPos: Record<string, number> = {};
 const byDecade: Record<string, number> = {};
-for (const p of output as any[]) {
+for (const p of output as unknown as OutputRecord[]) {
   byPos[p.position]  = (byPos[p.position]  ?? 0) + 1;
   byDecade[p.decade] = (byDecade[p.decade] ?? 0) + 1;
 }

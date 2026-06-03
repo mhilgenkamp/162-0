@@ -14,8 +14,8 @@ export const ROSTER_TEMPLATE: Omit<RosterSlot, "player">[] = [
   { label: "SP",  type: "pitcher" },
   { label: "SP",  type: "pitcher" },
   { label: "SP",  type: "pitcher" },
-  { label: "RP",  type: "pitcher" },
-  { label: "RP",  type: "pitcher" },
+  { label: "SP",  type: "pitcher" },
+  { label: "SP",  type: "pitcher" },
   { label: "RP",  type: "pitcher" },
 ];
 

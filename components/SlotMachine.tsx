@@ -21,19 +21,21 @@ export default function SlotMachine({
   teamSkipsLeft,
   decadeSkipsLeft,
 }: Props) {
-  const [displayTeam, setDisplayTeam] = useState(result.team);
-  const [displayDecade, setDisplayDecade] = useState(result.decade);
+  // Animated values — only updated by the interval during a spin
+  const [animatedTeam, setAnimatedTeam] = useState(result.team);
+  const [animatedDecade, setAnimatedDecade] = useState(result.decade);
+
+  // Derive what to show: use live prop when settled, animated value while spinning.
+  // This avoids calling setState synchronously inside the effect body.
+  const displayTeam = spinning ? animatedTeam : result.team;
+  const displayDecade = spinning ? animatedDecade : result.decade;
 
   useEffect(() => {
-    if (!spinning) {
-      setDisplayTeam(result.team);
-      setDisplayDecade(result.decade);
-      return;
-    }
+    if (!spinning) return;
     let frame = 0;
     const interval = setInterval(() => {
-      setDisplayTeam(TEAMS[Math.floor(Math.random() * TEAMS.length)]);
-      setDisplayDecade(DECADES[Math.floor(Math.random() * DECADES.length)]);
+      setAnimatedTeam(TEAMS[Math.floor(Math.random() * TEAMS.length)]);
+      setAnimatedDecade(DECADES[Math.floor(Math.random() * DECADES.length)]);
       frame++;
       if (frame > 18) clearInterval(interval);
     }, 80);
